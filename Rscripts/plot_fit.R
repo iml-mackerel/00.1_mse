@@ -27,7 +27,7 @@ saveplot(recplot(x,trans=function(x)x),name='rec_log',dim=c(17,10),wd=.wd,type=t
 saveplot(catchplot(x,fleet = 1,ci=FALSE)+scale_y_continuous(limits=c(0,100000),expand = c(0,0)),name='catch',dim=c(17,10),wd=.wd,type=type)
 saveplot(ssbplot(x)+scale_y_continuous(limits=c(0,9e5),expand = c(0,0)),name='ssb',dim=c(17,10),wd=.wd,type=type)
 saveplot(fbarplot(x)+scale_y_continuous(limits=c(0,4),expand = c(0,0)),name='F',dim=c(17,10),wd=.wd,type=type)
-saveplot(plot(refBase),name='RP',dim=c(14,14),wd=.wd,type=type)
+saveplot(plot(refBase),name='rp',dim=c(14,14),wd=.wd,type=type)
 saveplot(selplot(x),name='sel',dim=c(14,14),wd=.wd,type=type)
 saveplot(expplot(x),name='exp',dim=c(17,10),wd=.wd,type=type)
 saveplot(parplot(x),name='par',dim=c(17,17),wd=.wd,type=type)
@@ -41,7 +41,7 @@ saveplot(scplot(x),name='ssb_rel',dim=c(20,12),wd=.wd,type=type)
 
 if(retro){
     r <- retro(x,year=7,parallell=FALSE,silent=TRUE)  #maybe make plot with relative change
-    save(r, file=paste0('Rdata/retro/',name,'_retro.Rdata'))
+    save(r, file=paste0('Rdata/OMs/',name,'_retro.Rdata'))
     saveplot(plot(r,ci=FALSE),name="retro",dim=c(25,20),wd=.wd,type=type)
     saveplot(plot(r,ci=TRUE),name="retro_CI",dim=c(25,20),wd=.wd,type=type)
     m <- round(mohn(r),2)

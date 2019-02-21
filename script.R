@@ -28,22 +28,23 @@ surveys[[1]] <- surveys[[1]][!is.na(surveys[[1]]),1,drop=FALSE]
 attr(surveys[[1]],'time') <- c(0.47)
 
 # define catch limits
-ct[,1] <- ct[,1]*1.10 + ctUSA[-c(1:8),1]*0.25
-ct[,2] <- ct[,2] + ctUSA[-c(1:8),1]*0.50
+ctwusa <- ct
+ctwusa[,1] <- ct[,1]*1.10 + ctUSA[-c(1:8),1]*0.25
+ctwusa[,2] <- ct[,2] + ctUSA[-c(1:8),1]*0.50
 
 dat <- setup.ccam.data(surveys=surveys,
-                      residual.fleet=cn, # add argument called split.catch and see that residual.fleet does nothing if null
-                      total.catch=ct,
-                      prop.mature=mo,
-                      stock.mean.weight=sw,
-                      stock.start.weight=sw0,
-                      catch.mean.weight=cw,
-                      dis.mean.weight=dw,
-                      land.mean.weight=lw,
-                      prop.f=pf,
-                      prop.m=pm,
-                      natural.mortality=nm,
-                      land.frac=lf)
+                       residual.fleet=cn,
+                       total.catch=ctwusa,
+                       prop.mature=mo,
+                       stock.mean.weight=sw,
+                       stock.start.weight=sw0,
+                       catch.mean.weight=cw,
+                       dis.mean.weight=dw,
+                       land.mean.weight=lw,
+                       prop.f=pf,
+                       prop.m=pm,
+                       natural.mortality=nm,
+                       land.frac=lf)
 
 conf <- defcon(dat)
 conf$keySel <- matrix(c(0,1,2,3,4,4,4,4,4,4), nrow=nrow(conf$keySel), ncol=ncol(conf$keySel),byrow = T)
@@ -78,7 +79,7 @@ save(fitBase, file='Rdata/OMs/fitBase.Rdata')
 #################################################################################################################
 
 # plots
-# x <- fit
+# x <- fitBase
 # name <- 'fitBase'
 # source('Rscripts/plot_fit.R')
 
@@ -90,19 +91,17 @@ save(fitBase, file='Rdata/OMs/fitBase.Rdata')
 #************* define Operating Models *************************************
 #***************************************************************************
 ny=25
-nosim=500
+nosim=1000
 
 #--------------------- base model ------------------------------------------
-ny=25
-nosim=300
 OMbase <- list(fit=fitBase,
                nosim=nosim,
                OMlabel='OMbase',
-               year.base=2016,
-               ave.years=tail(fitBase$data$years,10),
-               rec.years=1969:2016,
+               year.base=2018,
+               ave.years=tail(fitBase$data$years,25),
+               rec.years=1969:2018,
                rec.meth=4, # trailing sampling recruitment
-               UL.years=tail(fitBase$data$years,10),
+               UL.years=tail(fitBase$data$years,25),
                deadzone=1000,
                Flim=2.5)
 
@@ -117,6 +116,7 @@ newdat1 <- dat
 newdat1$natMor[,] <- 0.15
 
 fitM <- ccam.fit(newdat1,conf,par)     # run phase 1 + censored
+fitM
 
     save(fitM, file='Rdata/OMs/fitM.Rdata')
     #load(file='Rdata/OMs/fitM.Rdata')
@@ -133,11 +133,29 @@ prettymatplot(sweep(exp(newUpper),1,exp(newUpper)[,1],'/'),col=c('darkgrey','bla
 newdat2$logobs[which(!is.na(newdat2$logobs[,2])),] <- newUpper
 
 fitC <- ccam.fit(newdat2,conf,par)     # run phase 1 + censored
+fitC
 
     save(fitC, file='Rdata/OMs/fitC.Rdata')
     #load(file='Rdata/OMs/fitC.Rdata')
 
 OMcore3$fit=fitC
+
+# --------------------- Upper limit with 25% less USA------------------------------------------
+newdat3 <- dat
+
+ctwusa2 <- ct*1.10
+ctwusa2[,2] <- ct[,2] + ctUSA[-c(1:8),1]*0.25
+prettymatplot(sweep(ctwusa2,1,ctwusa2[,1],'/'),col=c('darkgrey','black'),ylab = 'Crel')
+
+newdat3$logobs[which(!is.na(newdat2$logobs[,2])),] <- log(ctwusa2)
+
+fitC <- ccam.fit(newdat3,conf,par)     # run phase 1 + censored
+fitC
+
+save(fitC, file='Rdata/OMs/fitC.Rdata')
+#load(file='Rdata/OMs/fitC.Rdata')
+
+OMcore4$fit=fitC
 
 # --------------------- OM list ------------------------------------------
 
@@ -152,8 +170,8 @@ OM.list=list(OMbase=OMbase,
 OMfits=c(fitBase=fitBase,FitM=fitM,fitC=fitC)
 p1 <- ssbplot(OMfits,ci=FALSE)+scale_y_continuous(limits=c(0,5e5),expand=c(0,0))
 p2 <- catchplot(OMfits,ci=FALSE)+scale_y_continuous(limits=c(0,1e5),expand=c(0,0))+ylab('Catch')
-saveplot(p1,name="exploitUSA",dim=c(17,10),wd='img/fit_compare')
-saveplot(p2,name="exploitUSA",dim=c(17,10),wd='img/fit_compare')
+saveplot(p1,name="OMssb",dim=c(17,10),wd='img/fit_compare')
+saveplot(p2,name="OMcatch",dim=c(17,10),wd='img/fit_compare')
 
 #*****************************************************************************
 #************* define Harvest Control Rules **********************************
@@ -171,17 +189,16 @@ MP1 <- list(MPlabel='MP1',
 copy(x=MP1,n=nMP,name=c('MP'))
 
 avail('MP')
-MP1$catchval <- rep(0,ny)
-MP2$MP <- rep('MPeggsimple',ny)
-MP3$MP <- rep('MPeggcomplex0',ny)
-MP4$MP <- rep('MPeggcomplex',ny)
-MP5$MP <- rep('MPeggcomplexramp',ny)
-MP6$MP <- rep('MPeggcomplex2000',ny)
-MP7$MP <- rep('MPeggcomplex4000',ny)
-MP8$MP <- rep('MPeggcomplex6000',ny)
-MP9$MP <- rep('MPeggcomplex8000',ny)
-MP10$MP <- rep('MPeggcomplex10000',ny)
-MP11$MP <- rep('MPeggcomplex15000',ny)
+MP2$catchval <- rep(0,ny)
+MP3$MP <- rep('MPeggsimple',ny)
+MP4$MP <- rep('MPeggcomplex0',ny)
+MP5$MP <- rep('MPeggcomplex',ny)
+MP6$MP <- rep('MPeggcomplexramp',ny)
+MP7$MP <- rep('MPeggcomplex2000',ny)
+MP8$MP <- rep('MPeggcomplex4000',ny)
+MP9$MP <- rep('MPeggcomplex6000',ny)
+MP10$MP <- rep('MPeggcomplex8000',ny)
+MP11$MP <- rep('MPeggcomplex10000',ny)
 
 # --------------------- MP list (include different IEs) ------------------------------------------
 
@@ -189,7 +206,7 @@ MP11$MP <- rep('MPeggcomplex15000',ny)
 nIE=5
 
 MPmat1=expand.grid(MP=paste0('MP',1:nMP), IE=c("IEindep4800", "IEindep6000", "IEindep7200", 
-                   "IEindepdecr", "IEindepdecrsteep", "IEnothing"))
+                   "IEindepdecr", "IEindepdecrsteep", "IEconstant"))
 MP.list1 <- lapply(split(MPmat1,1:nrow(MPmat1)),function(x){
     MPx <- get(as.character(x[1,1]))
     if(!is.na(x[1,2])) MPx$IE <- c(as.character(x[1,2]),'IEdep2550')
@@ -199,7 +216,7 @@ names(MP.list1) <- paste(as.character(MPmat1[,1]),as.character(MPmat1[,2]),'IEde
 
 ## with 50-75% USA
 MPmat2=expand.grid(MP=paste0('MP',1:nMP), IE=c("IEindep4800", "IEindep6000", "IEindep7200", 
-                                               "IEindepdecr", "IEindepdecrsteep", "IEnothing"))
+                                               "IEindepdecr", "IEindepdecrsteep", "IEconstant"))
 MP.list2 <- lapply(split(MPmat2,1:nrow(MPmat2)),function(x){
     MPx <- get(as.character(x[1,1]))
     if(!is.na(x[1,2])) MPx$IE <- c(as.character(x[1,2]),'IEdep5075')
@@ -232,27 +249,27 @@ length(scen.list)
 
 # forecast each scenario (combos MP/OM)
 Date = Sys.Date()
+Date = "2019-02-21"
 
-DateDir = paste0("Rdata",Date,"/")
+DateDir = paste0("Rdata/",Date,"/")
 dir.create(DateDir,showWarnings = FALSE)
 
-    save(scen.list, file='Rdata/scen.list.2018.11.29.Rdata')
+    save(scen.list, file='Rdata/scen.list.2019.02.21.Rdata')
     save(scen.list, file='Rdata/scen.list.F0.Rdata')
-    #load(file='Rdata/scen.list.2018.08.24.Rdata')
+    #load(file='Rdata/scen.list.2019.02.21.Rdata')
 
-# 48 is missing
-    
-toMatch <- paste0("MP",c(14),".IEindep6000")
-matches <- unique (grep(paste(toMatch,collapse="|"), 
+MP <- 2
+matches <- unique (grep(paste(paste0("MP",MP,".IEconstant"),collapse="|"), 
                             names(scen.list), value=TRUE))
-mylist <- scen.list[matches]
+sublist <- scen.list[matches]
 
-mylist <- scen.list
-length(mylist)
+length(sublist)
 
-empty <- lapply(1:length(mylist),function(x){
-    RUN <- do.call(forecast, mylist[[x]])
-    save(RUN,file=paste0(DateDir,names(mylist)[x],'.Rdata'))
+empty <- lapply(1:length(sublist),function(x){
+    f <- sublist[[x]]
+    RUN <- do.call(forecast, f)
+    save(RUN,file=paste0(DateDir,names(sublist)[x],'.Rdata'))
 })
+
 
 
