@@ -2,6 +2,15 @@
 #*** Mackerel MSE
 #*** Canadian mackerel (DFO, 2018)
 #*** based on CCAM package
+#
+# Intermediate steps are saved as Rdata, so either script can be run from scratch or from different points
+# - base model definition and fitting
+# - define core and stress OMs
+# - define HCRs
+# - create one list with all scenarios (OMs * HCRs)
+# - do forecasting
+# - load all forecast into one list
+# - plotting in separate scripts
 #################################################################################################################
 
 #################################################################################################################
@@ -269,6 +278,13 @@ class(runlist) <- 'forecastset'
 
 save(runlist, file=paste0('Rdata/runlist.',Date,'.Rdata'))
 
+#******************************************************************************
+#************* PLOTS  *********************************************************
+#******************************************************************************
 
-
+## see following scripts (messy yet so no to be sourced entirely):
+# Rscripts/plot_MSE   -> examples and minimum time to rebuilding
+# Rscripts/plot_obj   -> plot of objectives and trafe-offs. Generates csv files with raw data
+# Rscripts/plot_obj3  -> explores how to split catch
+# Rscripts/plot_resdoc_... -> plots for resdoc to illustrate HCRs, IE, etc.
 
