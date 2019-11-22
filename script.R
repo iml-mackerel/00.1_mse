@@ -17,6 +17,7 @@ dw <- read.ices("data/dw.dat")
 lf <- read.ices("data/lf.dat")
 lw <- read.ices("data/lw.dat")
 mo <- read.ices("data/mo.dat")
+mo <- smoothmatrix(mo,subset=8:nrow(mo),max=1,plot=TRUE)
 nm <- read.ices("data/nm.dat")
 nm[]<- 0.27
 pf <- read.ices("data/pf.dat")
@@ -26,13 +27,19 @@ sw0 <- read.ices("data/sw0.dat")
 surveys <- read.ices("data/survey.dat")
 surveys[[1]] <- surveys[[1]][!is.na(surveys[[1]]),1,drop=FALSE]
 attr(surveys[[1]],'time') <- c(0.47)
+tep <- read.ices("data/tep.dat")
+tep[[1]] <- tep[[1]][!is.na(tep[[1]]),1,drop=FALSE]
+tep[[1]][,1] <- tep[[1]][,1]*1000000000000
+attr(tep[[1]],'time') <- c(0.47)
+pfem <- read.ices("data/propFemale.dat")
+fec <- read.ices("data/fec.dat")
 
 # define catch limits
 ctwusa <- ct
 ctwusa[,1] <- ct[,1]*1.10 + ctUSA[-c(1:8),1]*0.25
 ctwusa[,2] <- ct[,2] + ctUSA[-c(1:8),1]*0.50
 
-dat <- setup.ccam.data(surveys=surveys,
+dat <- setup.ccam.data(surveys=tep,
                        residual.fleet=cn,
                        total.catch=ctwusa,
                        prop.mature=mo,
@@ -44,16 +51,19 @@ dat <- setup.ccam.data(surveys=surveys,
                        prop.f=pf,
                        prop.m=pm,
                        natural.mortality=nm,
-                       land.frac=lf)
+                       land.frac=lf,
+                       prop.fem=pfem,
+                       fec=fec)
 
 conf <- defcon(dat)
 conf$keySel <- matrix(c(0,1,2,3,4,4,4,4,4,4), nrow=nrow(conf$keySel), ncol=ncol(conf$keySel),byrow = T)
 conf$keyVarObs[1,]=-1                     
 conf$keyVarObs[2,1:9]=c(0,1,2,2,2,2,2,2,1) 
 conf$keyVarObs[3,1]=3           
-conf$stockRecruitmentModelCode=0 #0: RW, 1: ricker, 2: BH, 3:mean
-conf$fbarRange=c(5,10)
+conf$stockRecruitmentModelCode=2 #0: RW, 1: ricker, 2: BH, 3:mean
 conf$obsLikelihoodFlag[1]='CE'
+conf$keyBiomassTreat[3]=5
+conf$fbarRange=c(5,10) #fully recruited fish
 
 par <- defpar(dat,conf)
 
@@ -68,7 +78,7 @@ save(par,file='Rdata/input/par.Rdata')
 ########### fit model ###########################################################################################
 #################################################################################################################
 
-fitBase <- ccam.fit(dat,conf,par)            
+fitBase <- ccam.fit(dat,conf,par,silent=FALSE,paracheck = FALSE)            
 fitBase
 
 save(fitBase, file='Rdata/OMs/fitBase.Rdata')
@@ -90,88 +100,82 @@ save(fitBase, file='Rdata/OMs/fitBase.Rdata')
 #***************************************************************************
 #************* define Operating Models *************************************
 #***************************************************************************
-ny=25
-nosim=1000
+ny=11
+nosim=2000
 
 #--------------------- base model ------------------------------------------
 OMbase <- list(fit=fitBase,
                nosim=nosim,
                OMlabel='OMbase',
+               IE=c('IEindep2019','IEdep2550'),
                year.base=2018,
                ave.years=tail(fitBase$data$years,25),
                rec.years=1969:2018,
-               rec.meth=4, # trailing sampling recruitment
+               rec.meth=1, # BH with AC
                UL.years=tail(fitBase$data$years,25),
                deadzone=1000,
-               Flim=2.5)
+               Flim=2.5,
+               fleet=3)
 
-copy(x=OMbase,n=c(5,2),name=c('OMcore','OMstress'))
+copy(x=OMbase,n=c(4,3),name=c('OMcore','OMstress'))
 
 # --------------------- recruitment ------------------------------------------
-OMcore1$rec.meth=2 # around average
-attr(OMstress1$rec.meth,'AC')=0.9
+OMstress1$rec.meth=2 # around average
+OMcore1$rec.meth=2 #around average, delayed
+attr(OMcore1$rec.meth,'AC')=0.9
 
 # ---------------------  M ----------------------------------------------------
 newdat1 <- dat
 newdat1$natMor[,] <- 0.15
 
-fitM <- ccam.fit(newdat1,conf,par)     # run phase 1 + censored
-fitM
-
-    save(fitM, file='Rdata/OMs/fitM.Rdata')
-    #load(file='Rdata/OMs/fitM.Rdata')
+#fitM <- ccam.fit(newdat1,conf,par)     # run phase 1 + censored
+#fitM
+#save(fitM, file='Rdata/OMs/fitM.Rdata')
+    load(file='Rdata/OMs/fitM.Rdata')
 
 OMcore2$fit=fitM
-OMstress2$bio.scale=list('nm'=1.2) #because 0.8 would not be a stress..
-
+OMcore3$bio.scale=list('nm'=1.2) #because 0.8 would not be a stress..
 
 # --------------------- Upper limit with 25% extra USA------------------------------------------
-newdat2 <- dat
-oldUpper <- newdat2$logobs[which(!is.na(newdat2$logobs[,2])),]
-newUpper <- log(sweep(exp(oldUpper),1,0.25*ctUSA[-c(1:8),1],'+'))
-prettymatplot(sweep(exp(newUpper),1,exp(newUpper)[,1],'/'),col=c('darkgrey','black'),ylab = 'Crel')
-newdat2$logobs[which(!is.na(newdat2$logobs[,2])),] <- newUpper
+# newdat2 <- dat
+# oldUpper <- newdat2$logobs[which(!is.na(newdat2$logobs[,2])),]
+# newUpper <- log(sweep(exp(oldUpper),1,0.25*ctUSA[-c(1:8),1],'+'))
+# prettymatplot(sweep(exp(newUpper),1,exp(newUpper)[,1],'/'),col=c('darkgrey','black'),ylab = 'Crel')
+# newdat2$logobs[which(!is.na(newdat2$logobs[,2])),] <- newUpper
+# 
+# fitC1 <- ccam.fit(newdat2,conf,par)     # run phase 1 + censored
+# fitC1
+# save(fitC1, file='Rdata/OMs/fitC1.Rdata')
+    load(file='Rdata/OMs/fitC1.Rdata')
 
-fitC <- ccam.fit(newdat2,conf,par)     # run phase 1 + censored
-fitC
-
-    save(fitC, file='Rdata/OMs/fitC.Rdata')
-    #load(file='Rdata/OMs/fitC.Rdata')
-
-OMcore3$fit=fitC
+OMcore4$fit=fitC1
+OMcore4$IE <- c('IEindep2019','IEdep5075')
 
 # --------------------- Upper limit with 25% less USA------------------------------------------
-newdat3 <- dat
+# newdat3 <- dat
+# 
+# ctwusa2 <- ct*1.10
+# ctwusa2[,2] <- ct[,2] + ctUSA[-c(1:8),1]*0.25
+# prettymatplot(sweep(ctwusa2,1,ctwusa2[,1],'/'),col=c('darkgrey','black'),ylab = 'Crel')
+# 
+# newdat3$logobs[which(!is.na(newdat3$logobs[,2])),] <- log(ctwusa2)
+# 
+# fitC2 <- ccam.fit(newdat3,conf,par)     # run phase 1 + censored
+# fitC2
+# 
+# save(fitC2, file='Rdata/OMs/fitC2.Rdata')
+load(file='Rdata/OMs/fitC2.Rdata')
 
-ctwusa2 <- ct*1.10
-ctwusa2[,2] <- ct[,2] + ctUSA[-c(1:8),1]*0.25
-prettymatplot(sweep(ctwusa2,1,ctwusa2[,1],'/'),col=c('darkgrey','black'),ylab = 'Crel')
+OMstress2$fit=fitC2
+OMstress2$IE <- c('IEindep2019','IEdep0025')
 
-newdat3$logobs[which(!is.na(newdat2$logobs[,2])),] <- log(ctwusa2)
+# --------------------- USA uses Canadian TAC------------------------------------------
+OMstress3$IE <- c('IEindep2019','IEdepcopy')
 
-fitC <- ccam.fit(newdat3,conf,par)     # run phase 1 + censored
-fitC
+# --------------------- OM plots ------------------------------------------
 
-save(fitC, file='Rdata/OMs/fitC.Rdata')
-#load(file='Rdata/OMs/fitC.Rdata')
-
-OMcore4$fit=fitC
-
-# --------------------- OM list ------------------------------------------
-
-OM.list=list(OMbase=OMbase,
-             OMcore1=OMcore1,
-             OMcore2=OMcore2,
-             OMcore3=OMcore3,
-             OMstress1=OMstress1,
-             OMstress2=OMstress2)
-
-
-OMfits=c(fitBase=fitBase,FitM=fitM,fitC=fitC)
-p1 <- ssbplot(OMfits,ci=FALSE)+scale_y_continuous(limits=c(0,5e5),expand=c(0,0))
-p2 <- catchplot(OMfits,ci=FALSE)+scale_y_continuous(limits=c(0,1e5),expand=c(0,0))+ylab('Catch')
-saveplot(p1,name="OMssb",dim=c(17,10),wd='img/fit_compare')
-saveplot(p2,name="OMcatch",dim=c(17,10),wd='img/fit_compare')
+# plots
+# source('Rscripts/plot_OMs.R')
 
 #*****************************************************************************
 #************* define Harvest Control Rules **********************************
@@ -182,13 +186,13 @@ saveplot(p2,name="OMcatch",dim=c(17,10),wd='img/fit_compare')
 nMP=11
 
 MP1 <- list(MPlabel='MP1',
-            IE=NULL,
             capLower=0,
             TAC.base=10000)
 
 copy(x=MP1,n=nMP,name=c('MP'))
 
 avail('MP')
+MP1$catchval <- rep(0,ny)
 MP2$catchval <- rep(0,ny)
 MP3$MP <- rep('MPeggsimple',ny)
 MP4$MP <- rep('MPeggcomplex0',ny)
@@ -200,76 +204,71 @@ MP9$MP <- rep('MPeggcomplex6000',ny)
 MP10$MP <- rep('MPeggcomplex8000',ny)
 MP11$MP <- rep('MPeggcomplex10000',ny)
 
-# --------------------- MP list (include different IEs) ------------------------------------------
-
-## with 25%-50% USA
-nIE=5
-
-MPmat1=expand.grid(MP=paste0('MP',1:nMP), IE=c("IEindep4800", "IEindep6000", "IEindep7200", 
-                   "IEindepdecr", "IEindepdecrsteep", "IEconstant"))
-MP.list1 <- lapply(split(MPmat1,1:nrow(MPmat1)),function(x){
-    MPx <- get(as.character(x[1,1]))
-    if(!is.na(x[1,2])) MPx$IE <- c(as.character(x[1,2]),'IEdep2550')
-    return(MPx)
-})
-names(MP.list1) <- paste(as.character(MPmat1[,1]),as.character(MPmat1[,2]),'IEdep2550',sep=".")
-
-## with 50-75% USA
-MPmat2=expand.grid(MP=paste0('MP',1:nMP), IE=c("IEindep4800", "IEindep6000", "IEindep7200", 
-                                               "IEindepdecr", "IEindepdecrsteep", "IEconstant"))
-MP.list2 <- lapply(split(MPmat2,1:nrow(MPmat2)),function(x){
-    MPx <- get(as.character(x[1,1]))
-    if(!is.na(x[1,2])) MPx$IE <- c(as.character(x[1,2]),'IEdep5075')
-    return(MPx)
-})
-names(MP.list2) <- paste(as.character(MPmat2[,1]),as.character(MPmat2[,2]),'IEdep5075',sep=".")
-
 #******************************************************************************
-#************* forecast for each combination **********************************
+#************* Create all forecasting scenarios *******************************
 #******************************************************************************
-scenmat <- expand.grid(OM=names(OM.list), MP=names(MP.list1))
-scenmat[,1] <- as.character(scenmat[,1])
-scenmat[,2] <- as.character(scenmat[,2])
-scenmat[scenmat[,1]=='OMcore3',2] <- names(MP.list2)
-scennames <- apply(scenmat,1,paste,collapse = ".")
+OMs <- c('OMbase','OMcore1','OMcore2','OMcore3','OMcore4',
+         'OMstress1','OMstress2','OMstress3')
+MPs <-paste0('MP',1:nMP)
 
+scenmat <- expand.grid(OM=OMs,MP=MPs)
 
-# create a list with all scenarios to test (combos MP/OM)
-scen.list <- lapply(split(scenmat,1:nrow(scenmat)),function(x){
-    if(x[1,1]=='OMcore3'){
-        c(OM.list[[as.character(x[1,1])]],MP.list2[[as.character(x[1,2])]])
-    }else{
-        c(OM.list[[as.character(x[1,1])]],MP.list1[[as.character(x[1,2])]])
+scenlist <- lapply(split(scenmat,1:nrow(scenmat)),function(x){
+    OMx <- get(as.character(x[1,1]))
+    MPx <- get(as.character(x[1,2]))
+    if(x[1,2]=='MP1'){                    # MP1 only has one IE (nothing)
+        OMx$IE <- c('IEconstant')
     }
-    
+    c(OMx,MPx)
 })
-names(scen.list) <- scennames
+scennames <- apply(scenmat,1,paste,collapse = ".")
+names(scenlist) <- scennames
 
-length(scen.list)
+save(scenlist, file='Rdata/scenlist.2019.04.09.Rdata')
 
-# forecast each scenario (combos MP/OM)
-Date = Sys.Date()
-Date = "2019-02-21"
+#******************************************************************************
+#************* Run all forecasting scenarios **********************************
+#******************************************************************************
 
-DateDir = paste0("Rdata/",Date,"/")
+load(file='Rdata/scenlist.2019.04.09.Rdata')
+
+newdir <- FALSE
+
+if(newdir) Date <- Sys.Date() else Date <- "2019-04-09"   # continue in old directory or set new one
+
+DateDir <- paste0("Rdata/",Date,"/")
 dir.create(DateDir,showWarnings = FALSE)
 
-    save(scen.list, file='Rdata/scen.list.2019.02.21.Rdata')
-    save(scen.list, file='Rdata/scen.list.F0.Rdata')
-    #load(file='Rdata/scen.list.2019.02.21.Rdata')
 
-MP <- 2
-matches <- unique (grep(paste(paste0("MP",MP,".IEconstant"),collapse="|"), 
-                            names(scen.list), value=TRUE))
-sublist <- scen.list[matches]
+# select scenarios to run
+sublist <- scenlist
+
+            # # select specific things to run first
+            # sublist <- subMSE(scenlist,OM=c('core4','stress2','stress3'))
+            # 
+            # # or run what has not been done yet
+            # filenames <- dir(DateDir, pattern = ".Rdata")
+            # files <- paste0(DateDir,'/',filenames)
+            # done <- gsub(pattern = ".Rdata",replacement = "",x = filenames)
+            # sublist <- scenlist[-which(scennames %in% done)]
 
 length(sublist)
 
-empty <- lapply(1:length(sublist),function(x){
-    f <- sublist[[x]]
-    RUN <- do.call(forecast, f)
-    save(RUN,file=paste0(DateDir,names(sublist)[x],'.Rdata'))
-})
+# run
+multi.forecast(sublist,DateDir,parallel=TRUE,ncores=7)
+
+#******************************************************************************
+#************* Load all predictions *******************************************
+#******************************************************************************
+
+filenames <- dir(DateDir, pattern = ".Rdata")
+files <- paste0(DateDir,'/',filenames)
+runlist <- lapply(files, function(x) {print(x);get(load(x))})
+names(runlist) <- gsub(pattern = ".Rdata",replacement = "",x = filenames)
+class(runlist) <- 'forecastset'
+
+save(runlist, file=paste0('Rdata/runlist.',Date,'.Rdata'))
+
 
 
 

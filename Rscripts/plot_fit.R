@@ -4,7 +4,7 @@
 #*** based on CCAM package
 #################################################################################################################
 
-#x <- get(load(file='Rdata/fit/fit.Rdata'))
+#x <- get(load(file='Rdata/OMs/fitBase.Rdata'))
 
 type <- 'png'
 retro <- TRUE
@@ -13,6 +13,8 @@ procres <- TRUE
 
 .wd <- paste0('img/fit/',name)
 dir.create(.wd, showWarnings = FALSE)
+
+nol <- theme(legend.position = 'none')
 
 ### reference points
 refBase <- ypr(x,rec.years=1969:2016)
@@ -39,10 +41,12 @@ saveplot(kobeplot(x),name='kobe',dim=c(14,12),wd=.wd,type=type)
 update_geom_defaults("line", list(size = 1))
 saveplot(scplot(x),name='ssb_rel',dim=c(20,12),wd=.wd,type=type)
 
+pn <- ggplot(melt(ntable(fitBase)[-1,]),aes(x=Var1,y=value,fill=Var2))+geom_bar(stat = 'identity')+scale_fill_viridis_c(direction=-1)
+
 if(retro){
-    r <- retro(x,year=7,parallell=FALSE,silent=TRUE)  #maybe make plot with relative change
+    r <- retro(x,year=7,parallell=T,silent=TRUE)  #maybe make plot with relative change
     save(r, file=paste0('Rdata/OMs/',name,'_retro.Rdata'))
-    saveplot(plot(r,ci=FALSE),name="retro",dim=c(25,20),wd=.wd,type=type)
+    saveplot(plot(r,ci=FALSE),name="retro",dim=c(10,13),wd=.wd,type=type)
     saveplot(plot(r,ci=TRUE),name="retro_CI",dim=c(25,20),wd=.wd,type=type)
     m <- round(mohn(r),2)
     write.table(m,paste0(.wd,"/mohn.txt"))
@@ -63,18 +67,28 @@ if(procres){
 
 
 # residuals the old way (though they are wrong because of autocorrelation due to random effects)
-# saveplot(resplot(x,fleets = 3,type=1),name="/res_index_1",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 3,type=2,out=1),name="/res_index_2",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 3,type=3),name="/res_index_3",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 3,type=4),name="/res_index_4",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 3,type=4,trans = exp),name="/res_index_5exp",dim=c(17,10),wd=.wd,type=type)
-# 
-# saveplot(resplot(x,fleets = 2,type=1,low=c('red','orange'),high=c('grey','green','darkgreen')),name="/res_caa_1",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 2,type=2,out=3),name="/res_caa_2",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 2,type=3),name="/res_caa_3",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 2,type=4),name="/res_caa_4",dim=c(25,20),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 2,type=5,std=TRUE),name="/res_caa_5",dim=c(25,20),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 2,type=6),name="/res_caa_6",dim=c(17,10),wd=.wd,type=type)
-# saveplot(resplot(x,fleets = 2,type=7),name="/res_caa_7",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 3,type=1),name="/res_index_1",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 3,type=2,out=1),name="/res_index_2",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 3,type=3),name="/res_index_3",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 3,type=4),name="/res_index_4",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 3,type=4,trans = exp),name="/res_index_5exp",dim=c(17,10),wd=.wd,type=type)
 
+saveplot(resplot(x,fleets = 2,type=1,low=c('red','orange'),high=c('grey','green','darkgreen')),name="/res_caa_1",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 2,type=2,out=3),name="/res_caa_2",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 2,type=3),name="/res_caa_3",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 2,type=4),name="/res_caa_4",dim=c(25,20),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 2,type=5,std=TRUE),name="/res_caa_5",dim=c(25,20),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 2,type=6),name="/res_caa_6",dim=c(17,10),wd=.wd,type=type)
+saveplot(resplot(x,fleets = 2,type=7),name="/res_caa_7",dim=c(17,10),wd=.wd,type=type)
 
+saveplot(grid.arrange(
+             arrangeGrob(
+                resplot(x,fleets = 3,type=1)+ggtitle('Index'),
+                resplot(x,fleets = 3,type=2),
+                resplot(x,fleets = 3,type=3),ncol=1),
+             arrangeGrob(
+                resplot(x,fleets = 2,type=6)+ggtitle('CAA'),
+                resplot(x,fleets = 2,type=2)+nol,
+                resplot(x,fleets = 2,type=3)+nol,ncol=1),
+             ncol=2),
+         name="/res_all",dim=c(18,16),wd=.wd,type=type)

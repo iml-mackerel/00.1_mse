@@ -1,5 +1,5 @@
 ##' save plots in one line
-##' @param plot plot
+##' @param p plot
 ##' @param name vector sting (without extension)
 ##' @param wd working directory in which to place image
 ##' @param dim vector of dimensions (cm)
@@ -10,18 +10,18 @@
 ##' @details Saves plot as png of pdf in one line
 ##' @rdname saveplot
 ##' @export
-saveplot <- function(plot,name,wd=NULL,dim,type='png',res=300,...){
+saveplot <- function(p,name,wd=NULL,dim,type='png',res=300,...){
     if(!is.null(wd)){wd=paste0(wd,'/')}
     switch(type,
            png={
                png(file=paste0(wd,name,".png"),units="cm",width=dim[1],height=dim[2],res=res,...)
-               if("ggplot" %in% class(plot)) grid.arrange(plot) else plot
+               if("ggplot" %in% class(p)) grid.arrange(p) else p
                dev.off() 
            },
            pdf={
                inch <- function(x){x/cm(1)}
                pdf(file=paste0(wd,name,".pdf"),width=inch(dim[1]),height=inch(dim[2]),...)
-               if("ggplot" %in% class(plot)) grid.arrange(plot) else plot
+               if("ggplot" %in% class(p)) grid.arrange(p) else p
                dev.off()    
            },
            {

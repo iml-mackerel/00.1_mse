@@ -35,7 +35,7 @@ Ihist[Ihist$year %in% Ycurrent,'class'] <- 'Iy'
 
 p1 <- ggplot(Ihist,aes(x=year,y=I))+geom_line(size=1)+
     geom_point(aes(col=class),size=1.1)+
-    labs(col='',y=expression(SSB["egg"] (t)),x='Year')+
+    labs(col='',y='Total Egg Production',x='Year')+
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(fill=alpha('white', 0)),
           legend.key = element_rect(colour = "transparent", fill = alpha("red", 0)))+
@@ -47,15 +47,15 @@ p1 <- ggplot(Ihist,aes(x=year,y=I))+geom_line(size=1)+
     geom_text(label='A)',y=Inf,x=-Inf,hjust=-0.3,vjust=1.3)
 
 BtoC <- data.frame(x=seq(0,Itarget*1.2,length.out = 100))
-BtoC$HCR3 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,0,0,25000)
-BtoC$HCR4 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,8000,0,25000) #abrupt
-BtoC$HCR5 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,8000,0,25000,TRUE) #ramp
-BtoC$HCR6 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,2000,2000,25000)
-BtoC$HCR7 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,4000,4000,25000)
-BtoC$HCR8 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,6000,6000,25000)
-BtoC$HCR9 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,8000,8000,25000)
-BtoC$HCR10 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,10000,10000,25000)
-BtoC$HCR11 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,15000,15000,25000)
+BtoC$HCR4 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,0,0,25000)
+BtoC$HCR5 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,8000,0,25000) #abrupt
+BtoC$HCR6 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,8000,0,25000,TRUE) #ramp
+BtoC$HCR7 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,2000,2000,25000)
+BtoC$HCR8 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,4000,4000,25000)
+BtoC$HCR9 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,6000,6000,25000)
+BtoC$HCR10 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,8000,8000,25000)
+BtoC$HCR11 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,10000,10000,25000)
+#BtoC$HCR11 <- sapply(BtoC$x, ItoTac, Itarget,I0,25000,15000,15000,25000)
 
 BtoC <- reshape2::melt(BtoC,id='x',value.name='TAC',variable.name='HCR')
 BtoC$HCR <- as.numeric(gsub('HCR','',BtoC$HCR))
@@ -63,7 +63,7 @@ BtoC$HCR <- as.numeric(gsub('HCR','',BtoC$HCR))
 TACtarget=25000
 
 p2 <- ggplot(BtoC,aes(x=x,y=TAC))+
-    labs(x=expression(SSB["egg"] (t)),col='')+
+    labs(x='Total Egg Production',col='')+
     geom_vline(xintercept=Itarget,col='darkgreen',linetype='dashed',size=0.8)+geom_text(x=Itarget,y=TACtarget,label=expression(I["high"]),vjust=-0.1,hjust=-0.2,col='darkgreen',size=3)+
     geom_vline(xintercept=I0,col='darkred',linetype='dashed',size=0.8)+  geom_text(x=I0,y=TACtarget,label=expression(I["low"]),vjust=-0.1,hjust=-0.4,col='darkred',size=3)+
     geom_vline(xintercept=Irecent,col='darkblue',linetype='dotted',size=0.8)+geom_text(x=Irecent,y=TACtarget,label=expression(I["y"]),vjust=-0.1,hjust=-0.2,col='darkblue',size=3)+
@@ -73,7 +73,6 @@ p2 <- ggplot(BtoC,aes(x=x,y=TAC))+
     scale_color_viridis(discrete = TRUE)
 
 p <- grid.arrange(p1,p2,ncol=2,widths=c(0.5,0.6))
-
 saveplot(p,name="HCR",dim=c(18,6.5),wd='img/resdoc')
 
 

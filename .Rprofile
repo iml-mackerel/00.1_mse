@@ -1,9 +1,9 @@
 .First <- function(){
   
   ### load packages
-  list.of.packages <- c('CCAM','reshape2','ggplot2','gridExtra','viridis','plyr')
+  list.of.packages <- c('CCAM','reshape2','ggplot2','gridExtra','viridis','plyr','grid','RColorBrewer')
   new.packages <- list.of.packages[!(list.of.packages %in% utils::installed.packages()[,"Package"])]
-  if(length(new.packages)) install.packages(new.packages)
+  if(length(new.packages)>0) install.packages(new.packages)
   lapply(list.of.packages, function(x) suppressMessages(require(x, character.only = TRUE)))
   
   ### source src directory

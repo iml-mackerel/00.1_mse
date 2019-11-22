@@ -1,251 +1,531 @@
 #################################################################################################################
 #*** Mackerel MSE
-#*** Plot MSE results
+#*** Plot random MSE results
 #################################################################################################################
 
 #******************************************************************************
 #************* Load all predictions *******************************************
 #******************************************************************************
 
-DateDir <- "Rdata/2019-02-19"
-filenames <- dir(DateDir, pattern = ".Rdata")
-files <- paste0(DateDir,filenames)
-runlist <- lapply(files, function(x) {print(x);get(load(x))})
-names(runlist)=gsub(pattern = ".Rdata",replacement = "",x = filenames)
-class(runlist)='forecastset'
+load(file='Rdata/runlist.2019-04-09.Rdata')
 
 #******************************************************************************
-#************* plot each forecast and compare**********************************
+#************* plots **********************************************************
 #******************************************************************************
-myrunlist=runlist
 
-for(i in 1:11){
-    runMP=myrunlist[grep(paste0("MP",i,".I"),names(myrunlist))]#base
-    class(runMP)='forecastset'
-    savepng(foreplot(runMP,what.y='probCZ',by = c('OM','IE')),wdIMG,paste0('/MSE/HalifaxSept_probCZ_MP',i),c(30,20))
+sub <- subMSE(runlist,MP=c(2:11))
+OMnam <- c('OMbase','OMcore1','OMcore2','OMcore3','OMcore4','OMstress1','OMstress2','OMstress3')
+OMshape <- c(17,16,16,16,16,16,16,16)
+OMcol <- c('black',brewer.pal(5,'Blues')[5:2],brewer.pal(4,'Reds')[4:2])
+threshold <- 0.75
+
+#--------------------------------------------------------------------------------
+#### Example run ssb (for ppt) ##################################################
+#--------------------------------------------------------------------------------
+base <- subMSE(runlist,MP=1,OM='base')[[1]]
+
+saveplot(ssb0plot(base,linesize=0.5,years=2005:2030),name="forecast_ssb_MP1_OMbase",dim=c(8,6),wd='img/MSE')
+
+baserec <- subMSE(runlist,MP=c(1,8),OM='base') # effect BH on recruitment
+
+saveplot(recplot(baserec,linesize=1,years=1969:2030,ci=FALSE),name="forecast_ssb_MP1_OMbase",dim=c(8,6),wd='img/MSE')
+
+
+## different Ms
+nmex <- subMSE(runlist,OM=c('base','core3','stress1'),MP=1)
+saveplot(ssb0plot(nmex,linesize=0.5,ci=FALSE),name="forecast_ssb_MP1_OMnm",dim=c(12,6),wd='img/MSE')
+
+#--------------------------------------------------------------------------------
+#### Example of forecasts ################################################
+#--------------------------------------------------------------------------------
+
+## when F0 -----------------------------------------------------------------------
+
+F0 <- subMSE(runlist,MP=1,OM=c('base','core1','core2'))
+p1 <- recplot(F0,ci=TRUE,years=2000:2029,linesize=1,legendnames=c(1:3))
+p2 <- recplot(F0[[2]],years=2000:2029,linesize=1)+ggtitle('OMcore1')
+p3 <- ssb0plot(F0[[1]],years=2000:2029,linesize=1)
+p4 <- ssb0plot(F0[[2]],years=2000:2029,linesize=1)
+
+saveplot(grid.arrange(p1,p2,p3,p4,ncol=2),name='forecast_SSBrec',dim=c(16,14),wd='img/resdoc')
+
+#--------------------------------------------------------------------------------
+#### Minimum Time for Rebuilding ################################################
+#--------------------------------------------------------------------------------
+
+## when F0 -----------------------------------------------------------------------
+
+HCR1 <- subMSE(runlist,MP=1)
+
+pHCR1.ssb <- ssb0plot(HCR1,ci=FALSE,linesize=1,legendnames=OMnam)+geom_vline(xintercept=2018,color='grey',linetype='dashed')+ggtitle('HCR1')
+saveplot(pHCR1.ssb,name="Trebuild_HCR1_ssb",dim=c(17,10),wd='img/mse')
+
+pHCR1.cz <- foreplot(HCR1,what.y='probCZ',rect=0.75,ylab='Probability out of the CZ',legendnames = OMnam)+ggtitle('HCR1')
+saveplot(pHCR1.cz,name="Trebuild_HCR1_cz",dim=c(17,10),wd='img/mse')
+
+df <- foreplot(HCR1,what.y='probCZ',data=TRUE)
+rebuildHCR1 <- ddply(df[df$y<0.75,],c('id','OM','MP','IE'),summarise,ny=length(y))
+
+## when TAC0 but still missing  ---------------------------------------------------
+
+HCR2 <- subMSE(runlist,MP=2)
+
+pHCR2.ssb <- ssb0plot(HCR2,ci=FALSE,linesize=1,legendnames=OMnam)+
+    geom_vline(xintercept=2018,color='grey',linetype='dashed')+
+    ggtitle('HCR2')
+saveplot(pHCR2.ssb,name="Trebuild_HCR2_ssb",dim=c(17,10),wd='img/mse')
+
+pHCR2.cz <- foreplot(HCR2,what.y='probCZ',rect=0.75,ylab='Probability out of the CZ',
+              legendnames = OMnam)+ggtitle('HCR2')
+saveplot(pHCR2.cz,name="Trebuild_HCR2_cz",dim=c(17,10),wd='img/mse')
+
+df <- foreplot(HCR2,what.y='probCZ',data=TRUE)
+rebuildHCR2 <- ddply(df[df$y<0.75,],c('id','OM','MP','IE'),summarise,ny=length(y))
+
+## combine------------------------------------------------------------------------------
+
+mylegend<-extractLegend(pHCR1.cz + theme(legend.position="bottom"))
+lheight <- sum(mylegend$height)
+gA <- ggplotGrob(pHCR1.cz + theme(legend.position="none")+ylab(''))
+gB <- ggplotGrob(pHCR2.cz+ theme(legend.position="none")+ylab(''))
+
+saveplot(grid.arrange(gtable_rbind(gA, gB),
+                      mylegend,
+                      ncol = 1,
+                      heights = unit.c(unit(1, "npc") - lheight, lheight),
+                      left='Probability out of the Critical Zone'),
+         name="Trebuild_min",
+         dim=c(11,12),
+         wd='img/mse')
+
+
+dfrebuild <- cbind(rebuildHCR1[,-c(3:4)],HCR2=rebuildHCR2$ny)
+names(dfrebuild)[3] <- 'HCR1'
+write.csv(dfrebuild, file = "csv/Trebuild.csv")
+
+
+#--------------------------------------------------------------------------------
+#### Objective 1b.	Years until SSB>LRP with 75% probability ####################
+#--------------------------------------------------------------------------------
+diamond_cz <- diamondplot(sub,what='probCZ',ylab='Years until SSB > LRP (75%)',year='threshold',threshold=0.75,IE=1,IEnames='',hline=c(5,10),OMtype = FALSE)+ 
+    scale_color_manual(values=OMcol)+
+    scale_shape_manual(values=OMshape)+
+    scale_y_continuous(limits=c(0,11),expand = c(0,0))
+
+saveplot(diamond_cz,name="Obj1b_75perc",dim=c(10,8),wd='img/mse')
+
+#--------------------------------------------------------------------------------
+#### Objective 2.	Probability of Growth #######################################
+#--------------------------------------------------------------------------------
+probgrowthCZ <- function(x){
+    y <- x[[1]]
+    ssb <- y$ssb
+    inCZ <- y$ssb<y$CZ #the ones that are in the CZ to start
+    ntot <- 0
+    ngrow <- 0
+    for(i in 2:length(x)){
+        y <- x[[i]]
+        nssb <- y$ssb
+        inCZ[inCZ] <- y$ssb[inCZ]<y$CZ[inCZ] # the ones that are still in the next year
+        grow <- nssb[inCZ]>ssb[inCZ]
+        #print(length(grow))
+        ntot <- ntot + length(grow)
+        ngrow <- ngrow + length(grow[grow])
+        print(length(grow[grow])/length(grow))
+        ssb <- nssb
+    }
+    round(ngrow/ntot*100,1) 
 }
 
+#check heaviest exploit
+x=subMSE(runlist,MP=11,OM='stress1')[[4]]
+probgrowthCZ(x)
 
-#subset for certain MPs/OMs
-toMatch1 <- c("14")
-toMatch1 <- c("MP5", "MP6", "MP7",'MP8','MP9')
-toMatch2 <- c("OMbase")
-toMatch3 <- c("IEnorm1")
+#the rest
+dfgrow <- ldply(sub,probgrowthCZ)
+dfgrow$OM <- gsub('[0-9]+', '', gsub("OM","",ldply(sub,function(x) attr(x,'OMlabel'))$V1))
+dfgrow$MP <- as.numeric(gsub("MP","",ldply(sub,function(x) attr(x,'MPlabel'))$V1))
+dfgrow$IE <- as.factor(gsub("IE","",unlist(lapply(strsplit(dfgrow$.id,'[.]'),'[[',3))))
+levels(dfgrow$IE) <- IEnam
+dfgrow$IE <- factor(dfgrow$IE,levels(dfgrow$IE)[attr(IEnam,'order')])
 
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-matches <- unique (grep(paste(toMatch2,collapse="|"), 
-                        matches, value=TRUE))
-matches <- unique (grep(paste(toMatch3,collapse="|"), 
-                        matches, value=TRUE))
-myrunlist=runlist[-which(names(runlist) %in% matches)]
-class(myrunlist)='forecastset'
+p <- ggplot(dfgrow,aes(x=MP,y=V1,col=OM,shape=OM))+
+    facet_wrap(~IE)+
+    geom_point(size=1.5)+labs(col='OM',shape='OM')+
+    labs(y='Growth probability (when in CZ)',x='HCR')+
+    scale_x_continuous(labels = as.character(unique(dfgrow$MP)), breaks = unique(dfgrow$MP))+
+    scale_color_manual(values=OMcol)+
+    scale_shape_manual(values=OMshape)+
+    scale_y_continuous(limits=c(50,100),expand=c(0,0))
 
-runnofish=runlistfull[grep(c('OMbase.MP1.IEnothing'),names(runlistfull))][[1]] #base
-
-
-#### with no fishing at all (runlist F0) ##############################################################################################################
-dir <- paste0(wdRdata,'F0',"/")
-filenames <- dir(dir, pattern = ".Rdata")
-files <- paste0(dir,filenames)
-runlist0 <- lapply(files, function(x) {print(x);get(load(x))})
-names(runlist0)=gsub(pattern = ".Rdata",replacement = "",x = filenames)
-class(runlist0)='forecastset'
-myrun0=runlist0
-
-legnam=c('OMbase','OMcore1','OMcore2','OMcore3','OMstress1','OMstress2','OMstress3')
-
-savepng(ssbplot(myrun0,ci=FALSE,linesize=1,legendnames=legnam)+geom_vline(xintercept=2016,color='grey',linetype='dashed')+ggtitle('F0'),wdIMG,'/MSE/HalifaxSept/F0_SSB',c(20,10))
-savepng(foreplot(myrun0,what.y='probCZ',rect=0.75,ylab='Probability out of the CZ',legendnames = legnam),wdIMG,'/MSE/HalifaxSept/F0_probCZ',c(20,10))
-df <- foreplot(myrun0,what.y='probCZ',data=TRUE)
-rebuild <- ddply(df[df$y<0.75,],c('id','OM','MP','IE'),summarise,ny=length(y))
-
-savepng(ssbplot(myrun0,ci=TRUE,linesize=1,legendnames=legnam)+geom_vline(xintercept=2016,color='grey',linetype='dashed')+ggtitle('F0'),wdIMG,'/MSE/HalifaxSept/F0_SSB_CI',c(20,10))
-
-#### TAC0, un6000 and US as usual ##############################################################################################################
-toMatch1 <- c("MP1.IEindep600")
-
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
-
-legnam=c('OMbase','OMcore1','OMcore2','OMcore3','OMstress1','OMstress2','OMstress3')
-
-savepng(ssbplot(myrun,ci=FALSE,linesize=1,legendnames=legnam)+geom_vline(xintercept=2016,color='grey',linetype='dashed')+ggtitle('F0'),wdIMG,'/MSE/HalifaxSept/TAC0_undecCAN6000_SSB',c(20,10))
-savepng(foreplot(myrun,what.y='probCZ',rect=0.75,ylab='Probability out of the CZ',legendnames = legnam),wdIMG,'/MSE/HalifaxSept/TAC0_undecCAN6000_probCZ',c(20,10))
-df <- foreplot(myrun,what.y='probCZ',data=TRUE)
-rebuild <- ddply(df[df$y<0.75,],c('id','OM','MP','IE'),summarise,ny=length(y))
+saveplot(p,name="obj2_growthCZ",dim=c(16,8),wd='img/mse')
 
 
-#### TAC0, uncan steep decrease, US as usual ##############################################################################################################
-toMatch1 <- c("MP1.IEnothing")
+#--------------------------------------------------------------------------------
+#### Milestone 2.	Probability of Growth #######################################
+#--------------------------------------------------------------------------------
+probgrowthy <- function(x,year){
+    y <- x[[1]]
+    ssb <- y$ssb
+    ntot <- 0
+    ngrow <- 0
+    for(i in 2:(year+1)){
+        y <- x[[i]]
+        nssb <- y$ssb
+        grow <- nssb>ssb
+        ntot <- ntot + length(grow)
+        ngrow <- ngrow + length(grow[grow])
+        ssb <- nssb
+    }
+    round(ngrow/ntot*100,1) 
+}
 
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
+#check heaviest exploit
+x=subMSE(runlist,MP=11,OM='stress1')[[4]]
+probgrowthy(x,3)
 
-legnam=c('OMbase','OMcore1','OMcore2','OMcore3','OMstress1','OMstress2','OMstress3')
-
-savepng(ssbplot(myrun,ci=FALSE,linesize=1,legendnames=legnam)+geom_vline(xintercept=2016,color='grey',linetype='dashed')+ggtitle('F0'),wdIMG,'/MSE/HalifaxSept/TAC0_undecCAN0_SSB',c(20,10))
-savepng(foreplot(myrun,what.y='probCZ',rect=0.75,ylab='Probability out of the CZ',legendnames = legnam),wdIMG,'/MSE/HalifaxSept/TAC0_undecCAN0_probCZ',c(20,10))
-df <- foreplot(myrun,what.y='probCZ',data=TRUE)
-rebuild <- ddply(df[df$y<0.75,],c('id','OM','MP','IE'),summarise,ny=length(y))
-
-#### TAC0, uncan steep decrease, US as usual ##############################################################################################################
-toMatch1 <- c("MP1.IEindepdecrsteep")
-
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
-
-legnam=c('OMbase','OMcore1','OMcore2','OMcore3','OMstress1','OMstress2','OMstress3')
-
-savepng(ssbplot(myrun,ci=FALSE,linesize=1,legendnames=legnam)+geom_vline(xintercept=2016,color='grey',linetype='dashed')+ggtitle('F0'),wdIMG,'/MSE/HalifaxSept/TAC0_undecCANsteepdecr_SSB',c(20,10))
-savepng(foreplot(myrun,what.y='probCZ',rect=0.75,ylab='Probability out of the CZ',legendnames = legnam),wdIMG,'/MSE/HalifaxSept/TAC0_undecCANsteepdecr_probCZ',c(20,10))
-df <- foreplot(myrun,what.y='probCZ',data=TRUE)
-rebuild <- ddply(df[df$y<0.75,],c('id','OM','MP','IE'),summarise,ny=length(y))
-
-
-#### constant TAC for first 5 years or so for some OM and IE 6000 ##############################################################################################################
-toMatch1 <- c("MP3.IEindep6000","MP6.IEindep6000", "MP7.IEindep6000", "MP8.IEindep6000",'MP9.IEindep6000','MP10.IEindep6000','MP11.IEindep6000')
-toMatch2 <- c("OMbase",'OMstress1')
-
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-matches <- unique (grep(paste(toMatch2,collapse="|"), 
-                        matches, value=TRUE))
-
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
-
-legnam=c(10000,15000,0,2000,4000,6000,8000)
-savepng(foreplot(myrun,what.y='ssb',ylab='SSB (t)',by=c('OM'),ci=FALSE,year=2016:2022,legendnames=legnam),wdIMG,'/MSE/HalifaxSept/TAC0-15000_undecCAN6000_SSB',c(20,10))
-savepng(foreplot(myrun,what.y='catch',ylab='Catch (t)',by=c('OM'),ci=FALSE,year=2016:2022,legendnames=legnam),wdIMG,'/MSE/HalifaxSept/TAC0-15000_undecCAN6000_catch',c(20,10))
-savepng(foreplot(myrun,what.y='TAC',ylab='TAC (t)',by=c('OM'),ci=FALSE,year=2016:2022,legendnames=legnam),wdIMG,'/MSE/HalifaxSept/TAC0-15000_undecCAN6000_TAC',c(20,10))
-
-#### MP 2 and 5, some OM and IE 6000 ##############################################################################################################
-toMatch1 <- c("MP2.IEindep6000","MP5.IEindep6000")
-toMatch2 <- c("OMbase",'OMstress1')
-
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-matches <- unique (grep(paste(toMatch2,collapse="|"), 
-                        matches, value=TRUE))
-
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
-
-legnam=c('MPeggsimple','MPeggtargetramp')
-savepng(foreplot(myrun,what.y='ssb',ylab='SSB (t)',by=c('OM'),ci=FALSE,year=2016:2022,legendnames=legnam),wdIMG,'/MSE/HalifaxSept/MP2.MP5_undecCAN6000_SSB',c(20,6))
-savepng(foreplot(myrun,what.y='catch',ylab='Catch (t)',by=c('OM'),ci=FALSE,year=2016:2022,legendnames=legnam),wdIMG,'/MSE/HalifaxSept/MP2.MP5_undecCAN6000_catch',c(20,6))
-savepng(foreplot(myrun,what.y='TAC',ylab='TAC (t)',by=c('OM'),ci=FALSE,year=2016:2022,legendnames=legnam),wdIMG,'/MSE/HalifaxSept/MP2.MP5_undecCAN6000_TAC',c(20,6))
-
-#### diamond plot with year out of CZ/HZ on y axis ##############################################################################################################
-IEnam =c('4800','6000','7200','decreasing','steep decreasing','no Canadian undeclared')
-savepng(diamondplot(runlist,what='probCZ',ylab='Years until SSB > LRP (75%)',year='threshold',threshold=0.75,IE=1,IEnames=IEnam,hline=5)+ 
-            scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_shape_manual(values=c(17,16,20)),wdIMG,'/MSE/HalifaxSept/obj1a_CZ_diamond_nyears',c(25,14))
-savepng(diamondplot(runlist,what='probHZ',ylab='Years until SSB > URP (75%)',year='threshold',threshold=0.75,IE=1,IEnames=IEnam,hline=10)+ 
-            scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_shape_manual(values=c(17,16,20)),wdIMG,'/MSE/HalifaxSept/obj1b_HZ_diamond_nyears',c(25,14))
-
-write.table(diamondplot(runlist,what='probCZ',year=2022,hline=0.75,IE=1,IEnames=IEnam,data=TRUE),
-            'probCZ.2022.txt', dec = ".")
-write.table(diamondplot(runlist,what='probCZ',year=2027,IE=1,IEnames=IEnam,data=TRUE),
-            'probCZ.2027.txt', dec = ".")
-write.table(diamondplot(runlist,what='probHZ',year=2027,hline=0.75,IE=1,IEnames=IEnam,data=TRUE),
-            'probCZ.2027.txt', dec = ".")
-write.table(diamondplot(runlist,what='probHZ',year=2037,IE=1,IEnames=IEnam,data=TRUE),
-            'probCZ.2037.txt', dec = ".")
-write.table(diamondplot(runlist,what='probCZ',year='threshold',threshold=0.75,hline=0.75,IE=1,IEnames=IEnam,data=TRUE),
-            'probCZ.byYear.txt', dec = ".")
-write.table(diamondplot(runlist,what='probHZ',year='threshold',threshold=0.75,IE=1,IEnames=IEnam,data=TRUE),
-            'probHZ.byYear.txt', dec = ".")
+# the rest
+dfgrowy <- ldply(sub,probgrowthy,3)
+names(dfgrowy) <- c('id','y3')
+dfgrowy$y5 <- ldply(sub,probgrowthy,5)$V1
+dfgrowy$y10 <- ldply(sub,probgrowthy,10)$V1
+dfgrowy$OM <- ldply(sub,function(x) attr(x,'OMlabel'))$V1
+dfgrowy$type <- gsub('[0-9]+', '', gsub("OM","",dfgrowy$OM))
+dfgrowy$MP <- as.numeric(gsub("MP","",ldply(sub,function(x) attr(x,'MPlabel'))$V1))
+dfgrowy$IE <- as.factor(gsub("IE","",unlist(lapply(strsplit(dfgrowy$id,'[.]'),'[[',3))))
+levels(dfgrowy$IE) <- IEnam
+dfgrowy$IE <- factor(dfgrowy$IE,levels(dfgrowy$IE)[attr(IEnam,'order')])
 
 
-#### diamond plot with year out of growth on y axis ##############################################################################################################
-IEnam =c('4800','6000','7200','decrease','steep decrease','no CAN undeclared')
-IE=1
-savepng(diamondplot(runlist,what='probGrowth',ylab='Median annual growth',year='zone',IE=1,IEnames=IEnam)+ 
-            scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_shape_manual(values=c(17,16,20)),wdIMG,'/MSE/HalifaxSept/obj2_growth_diamond_zones',c(25,10))
+add <- function(p){
+    p+facet_wrap(~IE)+
+        geom_hline(yintercept=50,col='grey',linetype='dashed')+
+        geom_hline(yintercept=95,col='darkgreen',linetype='dashed')+
+        geom_point(size=1.5)+
+        labs(x='HCR',col='OM',shape='OM')+
+        scale_x_continuous(labels = as.character(unique(dfgrowy$MP)), breaks = unique(dfgrowy$MP))+
+        scale_color_manual(values=OMcol)+
+        scale_shape_manual(values=OMshape)+
+        scale_y_continuous(limits=c(0,100),expand=c(0,0))
+}
 
-write.table(diamondplot(runlist,what='probGrowth',year='zone',IE=1,IEnames=IEnam,data=TRUE),
-            'probGrowth.txt', dec = ".")
+p3 <- add(ggplot(dfgrowy,aes(x=MP,y=y3,col=type,shape=type))+ggtitle('3 years'))
+p5 <- add(ggplot(dfgrowy,aes(x=MP,y=y5,col=type,shape=type))+ggtitle('5 years'))
+p10 <- add(ggplot(dfgrowy,aes(x=MP,y=y10,col=type,shape=type))+ggtitle('10 years'))
 
+mylegend<-extractLegend(p3+ theme(legend.position="bottom"))
+lheight <- sum(mylegend$height)
+gA <- ggplotGrob(p3 + theme(legend.position="none")+ylab('')+xlab(''))
+gB <- ggplotGrob(p5+ theme(legend.position="none")+ylab('')+xlab(''))
+gC <- ggplotGrob(p10+ theme(legend.position="none")+ylab(''))
 
-#### diamond plot with % of years the have high chance of above LRP (>75%) ##############################################################################################################
-IEnam =c('4800','6000','7200','decrease','steep decrease','no CAN undeclared')
-IE=1
-savepng(diamondplot(runlist,what='probCZ',ylab='% of next 25 years with >75% chance SSB>LRP',year='yearperc',IE=1,IEnames=IEnam,threshold=0.75)+ 
-            scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_shape_manual(values=c(17,16,20)),wdIMG,'/MSE/HalifaxSept/obj2_growth_diamond_yearperc',c(25,10))
+saveplot(grid.arrange(gtable_rbind(gA, gB, gC),
+                      mylegend,
+                      ncol = 1,
+                      heights = unit.c(unit(1, "npc") - lheight, lheight),
+                      left='Probability of growth'),
+         name="Mile2_3y_5y_10y",
+         dim=c(15,22),
+         wd='img/mse')
 
-write.table(diamondplot(runlist,what='probCZ',year='yearperc',threshold=0.75,IE=1,IEnames=IEnam,data=TRUE),
-            'PercYearsAboveLRP.txt', dec = ".")
-
-#### diamond plot with ratio SSB/LRP ##############################################################################################################
-IEnam =c('4800','6000','7200','decrease','steep decrease','no CAN undeclared')
-IE=1
-
-savepng(diamondplot(runlist,what='ssb',year=2016+5,IE=1,IEnames=IEnam,ylab='SSB/LRP',ratio=TRUE)+ 
-            scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_shape_manual(values=c(17,16,20)),wdIMG,'/MSE/HalifaxSept/obj1a_CZ_diamond_SSB.LRP_median_5y',c(25,10))
-
-savepng(diamondplot(runlist,what='ssb',year=2016+10,IE=1,IEnames=IEnam,ylab='SSB/LRP',ratio=TRUE)+ 
-            scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_shape_manual(values=c(17,16,20)),wdIMG,'/MSE/HalifaxSept/obj1a_CZ_diamond_SSB.LRP_median_10y',c(25,10))
-
-
-write.table(diamondplot(runlist,what='ssb',year=2016+5,IE=1,IEnames=IEnam,data=TRUE,ratio=TRUE),
-            'SSB.LRP_5y.txt', dec = ".")
-write.table(diamondplot(runlist,what='ssb',year=2016+10,IE=1,IEnames=IEnam,data=TRUE,ratio=TRUE),
-            'SSB.LRP_10y.txt', dec = ".")
-
-toMatch1 <- c("IEindep6000",".IEindepdecrsteep")
-toMatch2 <- c("OMbase",'OMstress1')
-
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-matches <- unique (grep(paste(toMatch2,collapse="|"), 
-                        matches, value=TRUE))
-
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
-
-legnam=c('6000','steep decrease')
-savepng(foreplot(myrun,what.y='ssb',ylab='SSB/LRP',by=c('MP','OM'),ci=FALSE,year=2016:2026,ratio=TRUE,legendnames = legnam)+
-            geom_hline(yintercept = 1,linetype='dashed'),wdIMG,'/MSE/HalifaxSept/obj1a_CZ_trajectories_SSB.LRP_median_10y',c(40,6))
-
-write.table(foreplot(myrun,what.y='ssb',ylab='SSB/LRP',by=c('MP','OM'),ci=FALSE,year=2016:2026,ratio=TRUE,legendnames = legnam,data=TRUE),
-            'SSB.LRP_trajectories.txt', dec = ".")
+range(dfgrowy[,c(2:4)])
 
 
+obj2 <- cbind(dfgrowy,CZ=dfgrow[,'V1'])
+obj2 <- obj2[,-1]
+write.csv(obj2, file = "csv/obj2.csv")
 
-#### Example of US undeclared catch ##############################################################################################################
-un <- attr(myrunlist[[1]],'IE')[[2]]
-dimnames(un)[[2]]<- 2017:(2016+25)
-savepng(boxplot.matrix(un,ylab='Undeclared catch (t)'),wdIMG,"/HCR/IE_USAbox",c(15,11))
-savepng(prettymatplot(t(un[20:29,]),ylab = 'Undeclared catch (t)')+theme(legend.position='none'),wdIMG,"/HCR/IE_USAline",c(11,6))
+#--------------------------------------------------------------------------------
+#### Objective 2new.	Avoid decline   #######################################
+#--------------------------------------------------------------------------------
+probdeclineCZ <- function(x){
+    y <- x[[2]]
+    ssb <- y$ssb
+    inCZ <- y$ssb<y$CZ #the ones that are in the CZ in 2019
+    ntot <- 0
+    ndecline <- 0
+    for(i in 3:length(x)){
+        y <- x[[i]]
+        nssb <- y$ssb
+        inCZ[inCZ] <- y$ssb[inCZ]<y$CZ[inCZ] # the ones that are still in the next year
+        decline <- nssb[inCZ]<ssb[inCZ]
+        #print(length(grow))
+        ntot <- ntot + length(decline)
+        ndecline <- ndecline + length(decline[decline])
+        print(length(decline[decline])/length(decline))
+        ssb <- nssb
+    }
+    round(ndecline/ntot*100,1) 
+}
+
+#check heaviest exploit
+x=subMSE(runlist,MP=11,OM='stress1')[[1]]
+probdeclineCZ(x)
+
+#the rest
+dfdecline <- ldply(sub,probdeclineCZ)
+dfdecline$OM <- ldply(sub,function(x) attr(x,'OMlabel'))$V1
+dfdecline$MP <- as.numeric(gsub("MP","",ldply(sub,function(x) attr(x,'MPlabel'))$V1))
+
+p <- ggplot(dfdecline,aes(x=MP,y=V1,col=OM,shape=OM))+
+    geom_point(size=1.5)+labs(col='OM',shape='OM')+
+    labs(y='probability of decline (when in CZ)',x='HCR')+
+    scale_x_continuous(labels = as.character(unique(dfdecline$MP)), breaks = unique(dfdecline$MP))+
+    scale_color_manual(values=OMcol)+
+    scale_shape_manual(values=OMshape)+
+    scale_y_continuous(limits=c(0,100),expand=c(0,0))
+
+saveplot(p,name="obj2_declineCZ",dim=c(16,8),wd='img/mse')
 
 
-#### extionction ##############################################################################################################
-toMatch1 <- c('IEindepdecrsteep.IEdep2550')
-toMatch2 <- c("OMbase")
+#--------------------------------------------------------------------------------
+#### Milestone 1b.	SSB/LRP #######################################
+#--------------------------------------------------------------------------------
+ssblrp <- function(x,quan){
+    simssb <- do.call('cbind',llply(x,function(x) x$ssb))
+    simcz <- do.call('cbind',llply(x,function(x) x$CZ))
+    sim <- simssb/simcz
+    q <- round(apply(sim,2,quantile,quan),2)
+    q
+}
 
-matches <- unique (grep(paste(toMatch1,collapse="|"), 
-                        names(runlist), value=TRUE))
-matches <- unique (grep(paste(toMatch2,collapse="|"), 
-                        matches, value=TRUE))
+#check heaviest exploit
+x=subMSE(runlist,MP=11,OM='stress1')[[1]]
+ssblrp(x,0.35)
 
-myrun=runlist[which(names(runlist) %in% matches)]
-class(myrun)='forecastset'
-length(myrun)
+# the rest
+dfratio <- ldply(sub,ssblrp,0.35)
+dfratio$OM <- ldply(sub,function(x) attr(x,'OMlabel'))$V1
+dfratio$MP <- as.numeric(gsub("MP","",ldply(sub,function(x) attr(x,'MPlabel'))$V1))
 
-foreplot(myrun,what.y='probExtinct',ylab='Extinction risk',ci=TRUE,by='MP')
+add <- function(p){
+    p+
+    geom_hline(yintercept=1,linetype='dashed',col='darkgrey')+
+    geom_point(size=1.5)+labs(col='OM',shape='OM')+
+    labs(x='HCR')+
+    scale_x_continuous(labels = as.character(unique(dfratio$MP)), breaks = unique(dfratio$MP))+
+    scale_color_manual(values=OMcol)+
+    scale_shape_manual(values=OMshape)
+}
+
+p3 <- add(ggplot(dfratio,aes(x=MP,y=V4,col=OM,shape=OM))+ggtitle('3 years'))
+p5 <- add(ggplot(dfratio,aes(x=MP,y=V6,col=OM,shape=OM))+ggtitle('5 years'))
+
+mylegend<-extractLegend(p3+ theme(legend.position="bottom"))
+lheight <- sum(mylegend$height)
+gA <- ggplotGrob(p3 + theme(legend.position="none")+ylab(''))
+gB <- ggplotGrob(p5+ theme(legend.position="none")+ylab('')+xlab(''))
+
+saveplot(grid.arrange(gtable_rbind(gA, gB),
+                      mylegend,
+                      ncol = 1,
+                      heights = unit.c(unit(1, "npc") - lheight, lheight),
+                      left='SSB / LRP (65th quantile)'),
+         name="Mile1b_3y_5y",
+         dim=c(11,12),
+         wd='img/mse')
+
+mile1b <- dfratio[,-1]
+names(mile1b)[1:26] <- 2018:(2018+25)
+write.csv(mile1b, file = "csv/mile1b.csv")
+
+#--------------------------------------------------------------------------------
+#### catch/TAC #################################
+#--------------------------------------------------------------------------------
+foreplot(sub,what.y = 'TAC',by='MP',year=2019:2030) #seems like TAC is increasing too fast or soon because it drops directly after
+OMcol2 <- c('black',brewer.pal(4,'Greens'),brewer.pal(3,'Reds'))
+
+c1 <- diamondplot(sub,what='TAC',ylab='Average TAC',xlab='HCR',year=c(2019:2029),OMtype = FALSE)+ 
+    scale_color_manual(values=OMcol2)+
+    scale_shape_manual(values=OMshape)
+
+c2 <- diamondplot(sub,what='catch',ylab='Average catch',xlab='HCR',year=c(2019:2029),OMtype = FALSE)+ 
+    scale_color_manual(values=OMcol2)+
+    scale_shape_manual(values=OMshape)
+
+saveplot(c1,name="Obj_TAC",dim=c(16,8),wd='img/mse')
+saveplot(c2,name="Obj_catch",dim=c(16,8),wd='img/mse')
+
+
+#--------------------------------------------------------------------------------
+#### Trade-off: catch - prob CZ #################################
+#--------------------------------------------------------------------------------
+
+trade <- extract(sub,'probCZ',add=T)
+trade$TAC <- extract(sub,'TAC',add=T)[,1]
+trade$MP <- as.numeric(gsub('MP','',trade$MP))
+trade$type <- gsub('[0-9]+', '', gsub("OM","",trade$OM))
+trade <- trade[order(trade$MP),]
+trade <- trade[trade$year %in% c(2021,2023,2028) & trade$type %in% c('base'),]
+trade <- trade[trade$MP != 3,]
+
+ggplot(trade,aes(x=TAC,y=var,col=MP))+geom_point()+
+    facet_wrap(~year)+
+    scale_color_viridis_c()+
+    labs(y='Probability out of CZ',col='HCR')+
+    theme(strip.background = element_blank())
+
+## see DLMtools
+
+#--------------------------------------------------------------------------------
+#### Exceptional circumstances #################################
+#--------------------------------------------------------------------------------
+runmp <- subMSE(runlist,MP=c(3:11))
+
+ind <- function(x,quan){
+    simindex <- do.call('cbind',llply(x,function(x) x$index))
+    q <- t(round(apply(simindex,2,quantile,quan),2))
+    colnames(q) <- c('q1','median','q3') 
+    q <- cbind(q,year=1:nrow(q)+2017)
+}
+dfindex <- ldply(runmp,ind,c(0.95,.5,0.05))
+dfindex$OM <- sapply(strsplit(dfindex$.id,'[.]'),'[[',1)
+dfindex$MP <- as.numeric(gsub('MP','',sapply(strsplit(dfindex$.id,'[.]'),'[[',2)))
+
+ggplot(dfindex[dfindex$OM=='OMcore4' & dfindex$MP==4,],aes(x=year,y=median))+
+    #geom_ribbon(aes(ymin=q1,ymax=q3),fill='grey')+
+    geom_line()+
+    facet_grid(OM~MP)
+
+
+
+#--------------------------------------------------------------------------------
+#### Other graphs ###############################################################
+#--------------------------------------------------------------------------------
+
+#--------------------------------------------------------------------------------
+#### Extinction #######################################
+#--------------------------------------------------------------------------------
+
+pext <- diamondplot(sub,what='percExtinct',ylab='Percentage Extinct',xlab='HCR',year=c(2019:2029),OMtype = FALSE)+ 
+    scale_color_manual(values=OMcol)+
+    scale_shape_manual(values=OMshape)
+
+saveplot(pext,name="Extinction",dim=c(16,8),wd='img/mse')
+
+
+#--------------------------------------------------------------------------------
+#### Effect Rec, C and M #######################################
+#--------------------------------------------------------------------------------
+
+probgrowthyall <- function(x,year){
+    y <- x[[1]]
+    ssb <- y$ssb
+    res <- c()
+    for(i in 2:(year+1)){
+        y <- x[[i]]
+        nssb <- y$ssb
+        grow <- nssb>ssb
+        ntot <- length(grow)
+        ngrow <- length(grow[grow])
+        ssb <- nssb
+        res <- c(res,round(ngrow/ntot*100,1) )
+    }
+    return(res)
+}
+
+#### REC
+rec <- subMSE(runlist,OM=c('base','core1','stress1'))
+
+recdf <- extract(rec,'probCZ',add=TRUE)
+recdf$type <- gsub('[0-9]+', '', gsub("OM","",recdf$OM))
+recdf$MP <- as.numeric(gsub("MP","",recdf$MP))
+recdf$IE <- as.factor(gsub("IE","",unlist(lapply(strsplit(recdf$IE,'[.]'),'[[',1))))
+levels(recdf$IE) <- IEnam
+recdf$IE <- factor(recdf$IE,levels(recdf$IE)[attr(IEnam,'order')])
+recdf <- recdf[recdf$year %in% c(2019:2028),]
+recdf$year <- factor(recdf$year)
+recdf$growth <- do.call('c',llply(rec,probgrowthyall,10))
+recdf <- recdf[!recdf$MP %in% c(1,3) & !recdf$IE=='no Canadian missing',]
+
+
+p1 <- ggplot(recdf,aes(x=year,y=var*100,col=OM))+geom_boxplot()+
+    facet_wrap(~MP)+
+    scale_x_discrete(breaks = levels(recdf$year)[c(T, rep(F, 4))])+
+    scale_color_viridis_d()+
+    ggtitle('Recruitment OMs')+
+    labs(y='Probability SSB > LRP',x='Year')
+
+p2 <- ggplot(recdf,aes(x=year,y=growth,col=OM))+geom_boxplot()+
+    facet_wrap(~MP)+
+    scale_x_discrete(breaks = levels(recdf$year)[c(T, rep(F, 4))])+
+    scale_color_viridis_d()+
+    ggtitle('Recruitment OMs')+
+    labs(y='Probability SSBy+1 > SSBy',xlab='Year')
+
+saveplot(p1,name="proj_rec_LRP",dim=c(14,12),wd='img/mse')
+saveplot(p2,name="proj_rec_growth",dim=c(14,12),wd='img/mse')
+
+#### M
+nm <- subMSE(runlist,OM=c('base','core3','stress1'))
+
+nmdf <- extract(nm,'probCZ',add=TRUE)
+nmdf$type <- gsub('[0-9]+', '', gsub("OM","",nmdf$OM))
+nmdf$MP <- as.numeric(gsub("MP","",nmdf$MP))
+nmdf$IE <- as.factor(gsub("IE","",unlist(lapply(strsplit(nmdf$IE,'[.]'),'[[',1))))
+levels(nmdf$IE) <- IEnam
+nmdf$IE <- factor(nmdf$IE,levels(nmdf$IE)[attr(IEnam,'order')])
+nmdf <- nmdf[nmdf$year %in% c(2019:2028),]
+nmdf$year <- factor(nmdf$year)
+nmdf$growth <- do.call('c',llply(nm,probgrowthyall,10))
+nmdf <- nmdf[!nmdf$MP %in% c(1,3) & !nmdf$IE=='no Canadian missing',]
+
+
+p1 <- ggplot(nmdf,aes(x=year,y=var*100,col=OM))+geom_boxplot()+
+    facet_wrap(~MP)+
+    scale_x_discrete(breaks = levels(nmdf$year)[c(T, rep(F, 4))])+
+    scale_color_viridis_d()+
+    ggtitle('natural mortality OMs')+
+    labs(y='Probability SSB > LRP',x='Year')
+
+p2 <- ggplot(nmdf,aes(x=year,y=growth,col=OM))+geom_boxplot()+
+    facet_wrap(~MP)+
+    scale_x_discrete(breaks = levels(nmdf$year)[c(T, rep(F, 4))])+
+    scale_color_viridis_d()+
+    ggtitle('natural mortality OMs')+
+    labs(y='Probability SSBy+1 > SSBy',xlab='Year')
+
+saveplot(p1,name="proj_nm_LRP",dim=c(14,12),wd='img/mse')
+saveplot(p2,name="proj_nm_growth",dim=c(14,12),wd='img/mse')
+
+#### C
+catch <- subMSE(runlist,OM=c('base','core3','stress3'))
+
+catchdf <- extract(catch,'probCZ',add=TRUE)
+catchdf$type <- gsub('[0-9]+', '', gsub("OM","",catchdf$OM))
+catchdf$MP <- as.numeric(gsub("MP","",catchdf$MP))
+catchdf$IE <- as.factor(gsub("IE","",unlist(lapply(strsplit(catchdf$IE,'[.]'),'[[',1))))
+levels(catchdf$IE) <- IEnam
+catchdf$IE <- factor(catchdf$IE,levels(catchdf$IE)[attr(IEnam,'order')])
+catchdf <- catchdf[catchdf$year %in% c(2019:2028),]
+catchdf$year <- factor(catchdf$year)
+catchdf$growth <- do.call('c',llply(catch,probgrowthyall,10))
+catchdf <- catchdf[!catchdf$MP %in% c(1,3) & !catchdf$IE=='no Canadian missing',]
+
+
+p1 <- ggplot(catchdf,aes(x=year,y=var*100,col=OM))+geom_boxplot()+
+    facet_wrap(~MP)+
+    scale_x_discrete(breaks = levels(catchdf$year)[c(T, rep(F, 4))])+
+    scale_color_viridis_d()+
+    ggtitle('catch OMs')+
+    labs(y='Probability SSB > LRP',x='Year')
+
+p2 <- ggplot(catchdf,aes(x=year,y=growth,col=OM))+geom_boxplot()+
+    facet_wrap(~MP)+
+    scale_x_discrete(breaks = levels(catchdf$year)[c(T, rep(F, 4))])+
+    scale_color_viridis_d()+
+    ggtitle('catch OMs')+
+    labs(y='Probability SSBy+1 > SSBy',xlab='Year')
+
+saveplot(p1,name="proj_catch_LRP",dim=c(14,12),wd='img/mse')
+saveplot(p2,name="proj_catch_growth",dim=c(14,12),wd='img/mse')
+
+#--------------------------------------------------------------------------------
+#### TO DELETE #################################################################
+#--------------------------------------------------------------------------------
+
+
+
 
 #### Age structure ##############################################################################################################
 library(stringr)
@@ -293,16 +573,6 @@ savepng(
 
 #### shit ##############################################################################################################
 
-### all together
-savepng(ssbplot(myrunlist,ci=FALSE)+scale_y_continuous(limits=c(0,800000)),wdIMG,'/MSE/SSB_TAC8000',c(25,15))
-savepng(fbarplot(myrunlist,ci=FALSE),wdIMG,'/MSE/Fbar_TAC8000',c(25,15))
-savepng(foreplot(myrunlist,what.y='probCZ',rect=0.75),wdIMG,'/MSE/CZ_TAC8000',c(17,10))
-savepng(recplot(myrunlist,ci=FALSE)+scale_y_continuous(limits=c(0,1000000)),wdIMG,'/MSE/rec_TAC8000',c(25,15))
-savepng(foreplot(myrunlist,what.y='probHZ',rect=0.75),wdIMG,'/MSE/HZ_TAC8000',c(17,10))
-savepng(foreplot(myrunlist,what.y='ssbmsyratio',ylab='ssb/ssbmsy',hline=1),wdIMG,'/MSE/SSBmsy_TAC8000',c(17,10))
-savepng(foreplot(myrunlist,what.y='fmsyratio',ylab='F/Fmsy',hline=1),wdIMG,'/MSE/Fmsy_TAC8000',c(17,10))
-savepng(foreplot(myrunlist,what.y='Umsyratio',ylab='U/Umsy',hline=1),wdIMG,'/MSE/Umsy_TAC8000',c(17,10))
-
 
 ## trade off plots by OM or MP or IE
 name='2018.08.16'
@@ -323,44 +593,12 @@ savepng(foreplot(myrunlist,what.y='Fmsyratio',ci=FALSE,hline=0.75,ylab='F/F40%')
 #### Objectives ##############################################################################################################
 
 
-### Objective 1: rebuild out of critical zone  with 75% prob
-IEnam =c('4800','6000','7200','decreasing','steep decreasing','no Canadian undeclared')
-savepng(foreplot(runlist,what.y='probCZ',ylab='Probability out of the CZ',by=c('OM','MP'),vline=c(5,10)+2016,rect=0.75),wdIMG,'/MSE/HalifaxSept/obj1a_CZ',c(40,25))
-savepng(diamondplot(runlist,what='probCZ',ylab='Probability out of the CZ',year=2022,hline=0.75,IE=1,IEnames=IEnam)+ scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_y_continuous(limits=c(0,1),expand=c(0,0)),wdIMG,'/MSE/HalifaxSept/obj1a_CZ_diamond_2022',c(25,14))
-savepng(diamondplot(runlist,what='probCZ',ylab='Probability out of the CZ',year=2027,hline=0.75,IE=1,IEnames=IEnam)+ scale_color_manual(values=c('orange','grey25','grey60'))+
-            scale_y_continuous(limits=c(0,1),expand=c(0,0)),wdIMG,'/MSE/HalifaxSept/obj1a_CZ_diamond_2027',c(25,14))
-
-
-mydf <- diamondplot(runlist,what='probCZ',year=2022,IE=1,IEnames=IEnam,data=TRUE)
-names(mydf)[6]='LRP5'
-mydf$LRP10 <- diamondplot(runlist,what='probCZ',year=2027,IE=1,IEnames=IEnam,data=TRUE)$y
-write.table(mydf,'probLRP_5y.10y.txt', dec = ".")
-
-mydf$diff=mydf$LRP10-mydf$LRP5
-hist(mydf$diff,50)
-abline(v=0,col='red')
-ggplot(mydf,aes(x=diff))+geom_histogram()+facet_grid(OM~MP)+geom_vline(xintercept = 0,col='red')
-
-### Objective 1b: rebuild into healthy zone with 75% prob
-savepng(foreplot(runlist,what.y='probHZ',ylab='Probability in HZ',by=c('OM','MP'),vline=c(5,10)+2016,rect=0.75),wdIMG,'/MSE/HalifaxSept/obj1b_HZ',c(40,25))
-savepng(diamondplot(runlist,what='probHZ',ylab='Probability into the HZ',year=2027,hline=0.75,IE=1,IEnames=IEnam)+ scale_color_manual(values=c('orange','grey25','grey60')),wdIMG,'/MSE/HalifaxSept/obj1b_HZ_diamond_2027',c(25,14))
-savepng(diamondplot(runlist,what='probHZ',ylab='Probability into the HZ',year=2037,hline=0.75,IE=1,IEnames=IEnam)+ scale_color_manual(values=c('orange','grey25','grey60')),wdIMG,'/MSE/HalifaxSept/obj1b_HZ_diamond_2037',c(25,14))
-
-
-## Objective 2: maintain a positive growth trajectory
-savepng(foreplot(runlist,what.y='probgrowth',by=c('OM','MP'),IE=1,ylab='Probability of growth'),wdIMG,'/MSE/HalifaxSept/obj2_growth',c(40,25))
-foreplot(runlist,what.y='probgrowth30',by='OM')
-
-# stuff should be added here (Numberof years prob of growth below x%)
-
 
 ## Objective 3: Maximize annual catches
 savepng(foreplot(runlist,what.y='catch',by=c('OM','MP'),IE=1,ci=FALSE),wdIMG,'/MSE/HalifaxSept/obj3_catch',c(40,25))
-savepng(diamondplot(runlist,what='catch',ylab='Average catch',IE=1,IEnames=IEnam)+ scale_color_manual(values=c('orange','grey25','grey60')),wdIMG,'/MSE/HalifaxSept/obj3_Caver_diamond_ally',c(25,14))
+savepng(diamondplot(runlist,what='catch',ylab='Average catch',IE=1,IEnames=IEnam,year = c(2019:2014))+ scale_color_manual(values=c('orange','grey25','grey60')),wdIMG,'/MSE/HalifaxSept/obj3_Caver_diamond_ally',c(25,14))
 savepng(diamondplot(runlist,what='catchcumul',ylab='Cumulative catch',IE=1,IEnames=IEnam,year=2016+25)+ scale_color_manual(values=c('orange','grey25','grey60')),wdIMG,'/MSE/HalifaxSept/obj3_TACaver_diamond_ally',c(25,14))
 
-diamondplot(runlist,what='TAC',ylab='Average TAC',IE=1,IEnames=IEnam)+ scale_color_manual(values=c('orange','grey25','grey60'))
 
 write.table(diamondplot(runlist,what='catch',year=2022:2026,IE=1,IEnames=IEnam,data=TRUE),
             'Cave_20222026.txt', dec = ".")
@@ -426,8 +664,6 @@ if(length(MPnum)>0) df$MP <- MPnum
 savepng(ggplot(df,aes(x=1,y=y))+geom_violin(draw_quantiles = TRUE,fill='black')+facet_wrap(.~MP,scale='free_y')+labs(y='relative change in TAC',x=''),wdIMG,'/MSE/HalifaxSept/obj4_TACrel_violin_ally',c(25,14))
 
 
-## all objectives
-savepng(MSEplot(runlist),wdIMG,'/MSE/HalifaxSept/objectives_ALL',c(40,25))
 
 
 

@@ -7,8 +7,8 @@ wd  <-  'img/data'
 type  <- 'png'
 
 ### cn (catch-at-age in numbers)
-p1 <- bubble(cn,col='darkblue',scale = 10)+ggtitle('Raw')
-saveplot(p1,name='cn_raw',dim=c(15,8),wd=wd,type=type)  # raw data
+p1 <- bubble(cn,col='black',scale = 8)+theme(legend.position = 'none')
+saveplot(p1,name='cn_raw',dim=c(11,6),wd=wd,type=type)  # raw data
 
 p2 <- bubble(t(spay(t(cn))),scale = 8)+ggtitle('Standardised by year')
 saveplot(p2,name='cn_spay_compCohorts',dim=c(15,8),wd=wd,type=type)  # to check cohorts
@@ -23,15 +23,15 @@ saveplot(p4,name='cn_prop',dim=c(15,8),wd=wd,type=type)  # proportion in populat
 p5 <- heat(mo)
 saveplot(p5,name='pm_heat',dim=c(15,8),wd=wd,type=type)  
 
-p6 <- prettymatplot(mo,ylab='Proportion mature',xlab='Year')
-saveplot(p6,name='pm_line',dim=c(15,8),wd=wd,type=type)  
+p6 <- prettymatplot(mo,ylab='Proportion mature',xlab='Year')+theme(legend.position = 'none')
+saveplot(p6,name='pm_line',dim=c(11,6),wd=wd,type=type)  
 
 ## stock weight
 p7 <- heat(sw)
 saveplot(p7,name='sw_heat',dim=c(15,8),wd=wd,type=type)  
 
-p8 <- prettymatplot(sw,ylab='Stock weight',xlab='Year')
-saveplot(p8,name='sw_line',dim=c(15,8),wd=wd,type=type) 
+p8 <- prettymatplot(sw,ylab='Stock weight',xlab='Year')+theme(legend.position = 'none')
+saveplot(p8,name='sw_line',dim=c(11,6),wd=wd,type=type) 
 
 ## catch weight
 p9 <- heat(cw)
@@ -42,7 +42,11 @@ saveplot(p10,name='cw_line',dim=c(15,8),wd=wd,type=type)
 
 ## survey
 update_geom_defaults("line", list(size = 1))
-p11 <- surveyplot(surveys)+ylab('SSB')+scale_y_continuous(limits=c(0,2000000),expand = c(0,0))
+p11 <- surveyplot(lapply(tep,'/',10^15))+ylab('TEP (x10^15)')+scale_y_continuous(limits=c(0,1.5),expand = c(0,0))+
+    theme(strip.background = element_blank(),
+          axis.line.x = element_line(colour = 'black'),
+          strip.text = element_text(colour='white'))
+    
 saveplot(p11,name='survey',dim=c(15,8),wd=wd,type=type) 
 
 ## total catch
@@ -63,6 +67,8 @@ allC <- cbind(allC, Total=rowSums(allC))
 p16 <- prettymatplot(allC,ylab='Catch (t)', xlab='Year',col=c('orange','yellowgreen','mediumorchid','black'))
 saveplot(p16,name='ct_all',dim=c(15,8),wd=wd,type=type) 
 
+### combination
+saveplot(grid.arrange(p8,p6,p1,p11,ncol=2),name='all',dim=c(18,12),wd=wd,type=type)
 
 
 
