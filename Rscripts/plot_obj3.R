@@ -8,7 +8,7 @@
 #************* Load and prepare ***********************************************
 #******************************************************************************
 
-load(file='Rdata/runlist_WG_April2019.Rdata')
+load(file='Rdata/runlist.2019.04.09.Rdata')
 
 ### raw data
 catch <- raw(runlist,'catch')

@@ -18,7 +18,9 @@ saveplot(p1,name="OMssb",dim=c(17,10),wd='img/fit_compare')
 saveplot(p2,name="OMcatch",dim=c(17,10),wd='img/fit_compare')
 
 saveplot(plot(OMfits,ci=FALSE,linesize=1),name="OMall",dim=c(11,13),wd='img/fit_compare')
-
+OMfitsfr <- OMfits
+names(OMfitsfr) <- c("MEbase","MEcore2",'MEcore4','MEstress2')
+saveplot(plot(OMfitsfr,ci=FALSE),name="OMall",dim=c(11,13),wd='img/resdoc/fr')
 
 catch <- catchtable(OMfits)
 catch$low <-NA

@@ -181,17 +181,20 @@ p <- ggplot(df,aes(x=year,group=fit))+
     geom_line(aes(col=fit,y=Estimate),size=1)+
     labs(y='Catch (t)',x='Year',col='',fill='')+
     geom_ribbon(aes(ymin=min,ymax=max,fill=factor(fit)),alpha=0.4)+
-    scale_color_viridis(discrete = TRUE)+
-    scale_fill_viridis(discrete = TRUE)+
+    scale_color_viridis(discrete = TRUE,direction = -1)+
+    scale_fill_viridis(discrete = TRUE,direction = -1)+
     facet_wrap(~fit)+
     geom_line(data=data.frame(y=ct[,1],year=dat$years),aes(y=y,x=year,group=NULL),size=1)+
     theme(legend.position ='none')+scale_x_continuous(expand = c(0,0))
 savepng(p,wdimg,"OM_catch_facet",c(16,12))
+pdf("img/paper/pdf/Figcatch.pdf", width=17/2.54, height=11/2.54)
+p
+dev.off()
 
-s <- 
+s <- ssbtable(OMfits)
 r <- rectable(OMfits)
 
-prod <- merge(ssbtable(OMfits)[,c(1,4:5)],rectable(OMfits)[,c(1,4:5)],by=c('fit','year'))
+prod <- merge(s[,c(1,4:5)],r[,c(1,4:5)],by=c('fit','year'))
 prod$prod <- prod$Estimate.y/prod$Estimate.x
 ggplot(prod,aes(x=year,y=prod,col=fit))+geom_line(size=0.5)+scale_color_viridis_d()
 

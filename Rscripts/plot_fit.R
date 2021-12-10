@@ -92,3 +92,16 @@ saveplot(grid.arrange(
                 resplot(x,fleets = 2,type=3)+nol,ncol=1),
              ncol=2),
          name="/res_all",dim=c(18,16),wd=.wd,type=type)
+
+
+saveplot(grid.arrange(
+    arrangeGrob(
+        resplot(x,fleets = 3,type=1)+ggtitle('Index')+labs(y='Résiduels',x='Année'),
+        resplot(x,fleets = 3,type=2)+labs(y='Résiduels',x='Prédictions'),
+        resplot(x,fleets = 3,type=3)+labs(y='Prédictions',x='Obervations'),ncol=1),
+    arrangeGrob(
+        resplot(x,fleets = 2,type=6)+labs(y='Résiduels',x='Année')+ggtitle('CAA'),
+        resplot(x,fleets = 2,type=2)+nol+labs(y='Résiduels',x='Prédictions'),
+        resplot(x,fleets = 2,type=3)+nol+labs(y='Prédictions',x='Obervations'),ncol=1),
+    ncol=2),
+    name="/res_all_fr",dim=c(18,16),wd=.wd,type=type)
