@@ -152,7 +152,7 @@ names(scenlist) <- scennames
 #************* Run all forecasting scenarios **********************************
 #******************************************************************************
 
-newdir <- TRUE
+newdir <- FALSE
 
 if(newdir) Date <- Sys.Date() else Date <- "2021-12-09"   # continue in old directory or set new one
 
