@@ -174,15 +174,16 @@ class(runlist) <- 'forecastset'
 #******************************************************************************
 #************* PLOTS  *********************************************************
 #******************************************************************************
+options(scipen=10000000)
 
 # some basic project plots
-p1 <- ssb0plot(runlist$OMbase.MP4000)
-p2 <- catchplot(runlist$OMbase.MP4000,ci=FALSE)
+p1 <- ssb0plot(runlist$OMbase.MP4000)+labs(y='SSB (t)')
+p2 <- catchplot(runlist$OMbase.MP4000,ci=FALSE) +labs(y='Catch (t)')
 saveplot(p1,name="ssb_4000",dim=c(15,10),wd='img/minister')
 saveplot(p2,name="catch_4000",dim=c(15,10),wd='img/minister')
 
-p1 <- ssb0plot(runlist$OMnoIE.MPmoratorium)
-p2 <- catchplot(runlist$OMnoIE.MPmoratorium,ci=FALSE)
+p1 <- ssb0plot(runlist$OMnoIE.MPmoratorium)+labs(y='SSB (t)')
+p2 <- catchplot(runlist$OMnoIE.MPmoratorium,ci=FALSE)+labs(y='Catch (t)')
 saveplot(p1,name="ssb_mora",dim=c(15,10),wd='img/minister')
 saveplot(p2,name="catch_mora",dim=c(15,10),wd='img/minister')
 
@@ -276,3 +277,7 @@ saveplot(grid.arrange(gtable_cbind(gA, gB, gC),
          dim=c(20,7),
          wd='img/minister')
 
+out <- catchtable(runlist)
+out[out$period=='Passed','period'] <- 'past'
+write.table(out,'catch_minister.csv',row.names = FALSE)
+write.table(out,'catch_minister.txt')
